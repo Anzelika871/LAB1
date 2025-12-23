@@ -14,15 +14,15 @@ from pathlib import Path
 
 from uno.engine import UnoSimulation
 # Imports Bots
-from uno.bots import RandomBot, WildFirstBot, WildLastBot
+from uno.bots import RandomBot, WildFirstBot, WildLastBot, MyBot
 
 
 class UNOCLI:
     """Command-line interface for UNO simulations"""
-    
+
     def __init__(self):
         self.parser = self._setup_parser()
-    
+
     def _setup_parser(self) -> argparse.ArgumentParser:
         """Configure argument parser"""
         parser = argparse.ArgumentParser(
@@ -32,21 +32,21 @@ class UNOCLI:
 Examples:
   # Run default comparison simulation
   python main.py
-  
+
   # Run with custom number of games
   python main.py --games 5000
-  
+
   # Run specific bot configuration
   python main.py --bots RandomBot WildFirstBot --names "Random Player" "Wild Strategy"
-  
+
   # Save results to file
   python main.py --output results.json --format json
-  
+
   # Run in quiet mode for batch processing
   python main.py --quiet --games 10000
             """
         )
-        
+
         # Simulation parameters
         sim_group = parser.add_argument_group("Simulation Parameters")
         sim_group.add_argument(
@@ -58,7 +58,7 @@ Examples:
         sim_group.add_argument(
             "--bots", "-b",
             nargs="+",
-            choices=["RandomBot", "WildFirstBot", "WildLastBot"],
+            choices=["RandomBot", "WildFirstBot", "WildLastBot", "MyBot"],
             default=["RandomBot", "WildFirstBot"],
             help="Bot types to include in simulation"
         )
@@ -73,7 +73,7 @@ Examples:
             type=int,
             help="Random seeds for bots (must match number of bots)"
         )
-        
+
         # Output options
         output_group = parser.add_argument_group("Output Options")
         output_group.add_argument(
@@ -97,120 +97,121 @@ Examples:
             action="store_true",
             help="Disable visualization plots"
         )
-        
+
         return parser
-    
+
     def create_bots(self, args: argparse.Namespace) -> List:
         """Instantiate bot objects based on CLI arguments"""
         bot_classes = {
             "RandomBot": RandomBot,
-            "WildFirstBot": WildFirstBot, 
-            "WildLastBot": WildLastBot
+            "WildFirstBot": WildFirstBot,
+            "WildLastBot": WildLastBot,
+            "MyBot": MyBot
         }
-        
+
         bots = []
         for i, bot_type in enumerate(args.bots):
             # Get bot class
             bot_class = bot_classes[bot_type]
-            
+
             # Configure name
-            name = args.names[i] if args.names and i < len(args.names) else f"{bot_type}_{i+1}"
-            
+            name = args.names[i] if args.names and i < len(args.names) else f"{bot_type}_{i + 1}"
+
             # Configure seed
             seed = args.seeds[i] if args.seeds and i < len(args.seeds) else None
-            
+
             # Instantiate bot
             if bot_class == RandomBot:
                 bot = bot_class(name, seed or i + 1)
             else:  # WildFirstBot, WildLastBot
                 bot = bot_class(name, seed or i + 1)
-            
+
             bots.append(bot)
-        
+
         return bots
-    
+
     def save_results(self, stats: Dict[str, Any], args: argparse.Namespace) -> None:
         """Save simulation results to file"""
         if not args.output:
             return
-        
+
         output_path = Path(args.output)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         if args.format == "json":
             with open(output_path, 'w') as f:
                 json.dump(stats, f, indent=2)
         elif args.format == "csv":
             # Implement CSV export if needed
             pass
-        
+
         if not args.quiet:
             print(f"Results saved to: {output_path}")
-    
+
     def run(self, args=None) -> Dict[str, Any]:
         """Execute UNO simulation with given arguments"""
         if args is None:
             args = self.parser.parse_args()
-        
+
         # Validate arguments
         if args.names and len(args.names) != len(args.bots):
             self.parser.error("Number of names must match number of bots")
-        
+
         if args.seeds and len(args.seeds) != len(args.bots):
             self.parser.error("Number of seeds must match number of bots")
-        
+
         # Create bots
         bots = self.create_bots(args)
-        
+
         if not args.quiet:
             print("Starting UNO Simulation")
             print(f"Configuration: {len(bots)} bots, {args.games} games")
             for bot in bots:
                 print(f"  - {bot.name} ({bot.__class__.__name__})")
             print("-" * 50)
-        
+
         # Run simulation
         simulation = UnoSimulation(bots, num_games=args.games)
         stats = simulation.run_simulation()
-        
+
         # Output results
         if not args.quiet:
             simulation.print_statistics(stats)
-            
+
             if not args.no_plot:
                 simulation.plot_statistics(stats)
-        
+
         # Save results
         self.save_results(stats, args)
-        
+
         return stats
 
 
 def run_default_simulation() -> Dict[str, Any]:
     """
     Run default comparison simulation.
-    
+
     Returns:
         Dictionary containing simulation statistics
     """
     bots = [
-        RandomBot("Random1", 1),
-        WildFirstBot("WildFirst", 2),
+        MyBot("MyBot", 1),
+        WildLastBot("WildFirstBot", 2),
     ]
-    
+
     simulation = UnoSimulation(bots, num_games=1_000)
     stats = simulation.run_simulation()
-    
+
     simulation.print_statistics(stats)
     simulation.plot_statistics(stats)
-    
+
     return stats
 
 
 def main():
     """Main entry point"""
     cli = UNOCLI()
-    
+
     try:
         # If no arguments provided, run default simulation
         if len(sys.argv) == 1:
@@ -218,9 +219,9 @@ def main():
             stats = run_default_simulation()
         else:
             stats = cli.run()
-        
+
         sys.exit(0)
-        
+
     except KeyboardInterrupt:
         print("\nSimulation interrupted by user")
         sys.exit(1)
